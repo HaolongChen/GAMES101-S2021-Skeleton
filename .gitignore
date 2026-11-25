@@ -1,6 +1,14 @@
-# build folder
-build
+# Build output
+/out/
+/build/
+vcpkg_installed/
 
-# vscode setting
+# Generated render outputs (model/texture assets under Assignment*/ stay tracked)
+*.png
+!Assignment*/**/*.png
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
 settings.json
-.vscode
