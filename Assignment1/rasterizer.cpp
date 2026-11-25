@@ -25,6 +25,10 @@ rst::ind_buf_id rst::rasterizer::load_indices(const std::vector<Eigen::Vector3i>
 // Code taken from a stack overflow answer: https://stackoverflow.com/a/16405254
 void rst::rasterizer::draw_line(Eigen::Vector3f begin, Eigen::Vector3f end)
 {
+    // Match the original's conversion semantics exactly: it subtracted the
+    // float endpoints first and truncated the deltas into ints, so do the
+    // same here rather than truncating the endpoints before subtracting
+    // (the two orders can differ by one pixel on fractional endpoints).
     const auto x1 = static_cast<int>(begin.x());
     const auto y1 = static_cast<int>(begin.y());
     const auto x2 = static_cast<int>(end.x());
@@ -32,8 +36,8 @@ void rst::rasterizer::draw_line(Eigen::Vector3f begin, Eigen::Vector3f end)
 
     const Eigen::Vector3f line_color = {255, 255, 255};
 
-    const int dx = x2 - x1;
-    const int dy = y2 - y1;
+    const int dx = static_cast<int>(end.x() - begin.x());
+    const int dy = static_cast<int>(end.y() - begin.y());
     const int dx1 = std::abs(dx);
     const int dy1 = std::abs(dy);
     int px = 2 * dy1 - dx1;
