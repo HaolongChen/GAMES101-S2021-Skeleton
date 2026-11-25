@@ -1,14 +1,8 @@
-//
-// Created by LEI XU on 4/9/19.
-//
+#pragma once
 
-#ifndef RASTERIZER_GLOBAL_H
-#define RASTERIZER_GLOBAL_H
+// Modern replacement for the old macro typedefs:
+//   u08  -> std::uint8_t (<cstdint>)
+//   MY_PI / TWO_PI -> std::numbers::pi (<numbers>)
+#include <cstdint>
 
-typedef unsigned char u08;
-#define MY_PI 3.1415926
-#define TWO_PI (2.0* MY_PI)
-
-
-
-#endif //RASTERIZER_GLOBAL_H
+using u08 = std::uint8_t;

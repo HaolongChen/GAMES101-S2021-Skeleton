@@ -1,12 +1,4 @@
-//
-// Created by LEI XU on 4/9/19.
-//
+#pragma once
 
-#ifndef RASTERIZER_GLOBAL_H
-#define RASTERIZER_GLOBAL_H
-
-//#define MY_PI 3.1415926
-//#define TWO_PI (2.0* MY_PI)
-
-
-#endif //RASTERIZER_GLOBAL_H
+// This header used to define MY_PI / TWO_PI macros. Use <numbers> instead:
+//   std::numbers::pi, 2.0 * std::numbers::pi

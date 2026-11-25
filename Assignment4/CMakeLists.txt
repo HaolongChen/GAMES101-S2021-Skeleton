@@ -1,10 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
-project(BezierCurve)
-
-find_package(OpenCV REQUIRED)
-
-set(CMAKE_CXX_STANDARD 14)
-
-add_executable(BezierCurve main.cpp)
-
-target_link_libraries(BezierCurve ${OpenCV_LIBRARIES})
+add_executable(pa4 main.cpp)
+target_link_libraries(pa4 PRIVATE
+    opencv_core opencv_imgproc opencv_imgcodecs opencv_highgui)
+games101_enable_warnings(pa4)

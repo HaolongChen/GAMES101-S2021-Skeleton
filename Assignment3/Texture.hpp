@@ -1,18 +1,25 @@
-//
-// Created by LEI XU on 4/27/19.
-//
+#pragma once
 
-#ifndef RASTERIZER_TEXTURE_H
-#define RASTERIZER_TEXTURE_H
 #include "global.hpp"
-#include <eigen3/Eigen/Eigen>
-#include <opencv2/opencv.hpp>
-class Texture{
-private:
+
+#include <Eigen/Eigen>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <string>
+
+class Texture
+{
+  private:
     cv::Mat image_data;
 
-public:
-    Texture(const std::string& name)
+  public:
+    int width = 0;
+    int height = 0;
+
+    Texture() = default;
+
+    explicit Texture(const std::string& name)
     {
         image_data = cv::imread(name);
         cv::cvtColor(image_data, image_data, cv::COLOR_RGB2BGR);
@@ -20,15 +27,12 @@ public:
         height = image_data.rows;
     }
 
-    int width, height;
-
-    Eigen::Vector3f getColor(float u, float v)
+    [[nodiscard]] Eigen::Vector3f getColor(float u, float v) const
     {
-        auto u_img = u * width;
-        auto v_img = (1 - v) * height;
+        auto u_img = static_cast<int>(u * static_cast<float>(width));
+        auto v_img = static_cast<int>((1.0f - v) * static_cast<float>(height));
         auto color = image_data.at<cv::Vec3b>(v_img, u_img);
-        return Eigen::Vector3f(color[0], color[1], color[2]);
+        return Eigen::Vector3f{static_cast<float>(color[0]), static_cast<float>(color[1]),
+                               static_cast<float>(color[2])};
     }
-
 };
-#endif //RASTERIZER_TEXTURE_H

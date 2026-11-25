@@ -1,11 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-project(Rasterizer)
-
-find_package(OpenCV REQUIRED)
-
-set(CMAKE_CXX_STANDARD 17)
-
-include_directories(/usr/local/include)
-
-add_executable(Rasterizer main.cpp rasterizer.hpp rasterizer.cpp global.hpp Triangle.hpp Triangle.cpp)
-target_link_libraries(Rasterizer ${OpenCV_LIBRARIES})
+add_executable(pa2 main.cpp rasterizer.cpp Triangle.cpp)
+target_link_libraries(pa2 PRIVATE
+    Eigen3::Eigen
+    opencv_core opencv_imgproc opencv_imgcodecs opencv_highgui)
+games101_enable_warnings(pa2)

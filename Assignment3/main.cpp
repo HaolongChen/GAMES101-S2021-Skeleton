@@ -1,24 +1,39 @@
-#include <iostream>
-#include <opencv2/opencv.hpp>
-
-#include "global.hpp"
-#include "rasterizer.hpp"
-#include "Triangle.hpp"
+#include "OBJ_Loader.h"
 #include "Shader.hpp"
 #include "Texture.hpp"
-#include "OBJ_Loader.h"
+#include "Triangle.hpp"
+#include "global.hpp"
+#include "rasterizer.hpp"
+
+#include <Eigen/Eigen>
+#include <cmath>
+#include <functional>
+#include <iostream>
+#include <numbers>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+#include <string>
+#include <vector>
+
+// Directory containing this assignment's models/, injected by CMake so the
+// binary finds its assets no matter where it is launched from.
+#ifndef GAMES101_MODELS_DIR
+#define GAMES101_MODELS_DIR "../models/"
+#endif
 
 Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
 {
     Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
 
     Eigen::Matrix4f translate;
-    translate << 1,0,0,-eye_pos[0],
-                 0,1,0,-eye_pos[1],
-                 0,0,1,-eye_pos[2],
-                 0,0,0,1;
+    translate << 1, 0, 0, -eye_pos[0],
+                 0, 1, 0, -eye_pos[1],
+                 0, 0, 1, -eye_pos[2],
+                 0, 0, 0, 1;
 
-    view = translate*view;
+    view = translate * view;
 
     return view;
 }
@@ -26,10 +41,10 @@ Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
 Eigen::Matrix4f get_model_matrix(float angle)
 {
     Eigen::Matrix4f rotation;
-    angle = angle * MY_PI / 180.f;
-    rotation << cos(angle), 0, sin(angle), 0,
+    angle = angle * std::numbers::pi_v<float> / 180.0f;
+    rotation << std::cos(angle), 0, std::sin(angle), 0,
                 0, 1, 0, 0,
-                -sin(angle), 0, cos(angle), 0,
+                -std::sin(angle), 0, std::cos(angle), 0,
                 0, 0, 0, 1;
 
     Eigen::Matrix4f scale;
@@ -110,7 +125,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
 
     for (auto& light : lights)
     {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
+        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular*
         // components are. Then, accumulate that result on the *result_color* object.
 
     }
@@ -140,9 +155,9 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
     Eigen::Vector3f result_color = {0, 0, 0};
     for (auto& light : lights)
     {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
+        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular*
         // components are. Then, accumulate that result on the *result_color* object.
-        
+
     }
 
     return result_color * 255.f;
@@ -152,7 +167,7 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
 
 Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payload)
 {
-    
+
     Eigen::Vector3f ka = Eigen::Vector3f(0.005, 0.005, 0.005);
     Eigen::Vector3f kd = payload.color;
     Eigen::Vector3f ks = Eigen::Vector3f(0.7937, 0.7937, 0.7937);
@@ -166,12 +181,12 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 
     float p = 150;
 
-    Eigen::Vector3f color = payload.color; 
+    Eigen::Vector3f color = payload.color;
     Eigen::Vector3f point = payload.view_pos;
     Eigen::Vector3f normal = payload.normal;
 
     float kh = 0.2, kn = 0.1;
-    
+
     // TODO: Implement displacement mapping here
     // Let n = normal = (x, y, z)
     // Vector t = (x*y/sqrt(x*x+z*z),sqrt(x*x+z*z),z*y/sqrt(x*x+z*z))
@@ -188,7 +203,7 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 
     for (auto& light : lights)
     {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
+        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular*
         // components are. Then, accumulate that result on the *result_color* object.
 
 
@@ -200,7 +215,7 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 
 Eigen::Vector3f bump_fragment_shader(const fragment_shader_payload& payload)
 {
-    
+
     Eigen::Vector3f ka = Eigen::Vector3f(0.005, 0.005, 0.005);
     Eigen::Vector3f kd = payload.color;
     Eigen::Vector3f ks = Eigen::Vector3f(0.7937, 0.7937, 0.7937);
@@ -214,7 +229,7 @@ Eigen::Vector3f bump_fragment_shader(const fragment_shader_payload& payload)
 
     float p = 150;
 
-    Eigen::Vector3f color = payload.color; 
+    Eigen::Vector3f color = payload.color;
     Eigen::Vector3f point = payload.view_pos;
     Eigen::Vector3f normal = payload.normal;
 
@@ -240,27 +255,37 @@ Eigen::Vector3f bump_fragment_shader(const fragment_shader_payload& payload)
 
 int main(int argc, const char** argv)
 {
-    std::vector<Triangle*> TriangleList;
+    std::vector<Triangle> TriangleList;
 
     float angle = 140.0;
     bool command_line = false;
 
     std::string filename = "output.png";
     objl::Loader Loader;
-    std::string obj_path = "../models/spot/";
+    const std::string obj_path = std::string(GAMES101_MODELS_DIR) + "spot/";
 
     // Load .obj File
-    bool loadout = Loader.LoadFile("../models/spot/spot_triangulated_good.obj");
-    for(auto mesh:Loader.LoadedMeshes)
+    bool loadout = Loader.LoadFile(obj_path + "spot_triangulated_good.obj");
+    if (!loadout) {
+        std::cerr << "Failed to load the model file. Check the model path: " << obj_path
+                  << '\n';
+        return 1;
+    }
+    for (const auto& mesh : Loader.LoadedMeshes)
     {
-        for(int i=0;i<mesh.Vertices.size();i+=3)
+        for (std::size_t i = 0; i < mesh.Vertices.size(); i += 3)
         {
-            Triangle* t = new Triangle();
-            for(int j=0;j<3;j++)
+            Triangle t;
+            for (std::size_t j = 0; j < 3; ++j)
             {
-                t->setVertex(j,Vector4f(mesh.Vertices[i+j].Position.X,mesh.Vertices[i+j].Position.Y,mesh.Vertices[i+j].Position.Z,1.0));
-                t->setNormal(j,Vector3f(mesh.Vertices[i+j].Normal.X,mesh.Vertices[i+j].Normal.Y,mesh.Vertices[i+j].Normal.Z));
-                t->setTexCoord(j,Vector2f(mesh.Vertices[i+j].TextureCoordinate.X, mesh.Vertices[i+j].TextureCoordinate.Y));
+                t.setVertex(j, Eigen::Vector4f(mesh.Vertices[i + j].Position.X,
+                                               mesh.Vertices[i + j].Position.Y,
+                                               mesh.Vertices[i + j].Position.Z, 1.0f));
+                t.setNormal(j, Eigen::Vector3f(mesh.Vertices[i + j].Normal.X,
+                                               mesh.Vertices[i + j].Normal.Y,
+                                               mesh.Vertices[i + j].Normal.Z));
+                t.setTexCoord(j, Eigen::Vector2f(mesh.Vertices[i + j].TextureCoordinate.X,
+                                                 mesh.Vertices[i + j].TextureCoordinate.Y));
             }
             TriangleList.push_back(t);
         }
@@ -307,13 +332,12 @@ int main(int argc, const char** argv)
         }
     }
 
-    Eigen::Vector3f eye_pos = {0,0,10};
+    const Eigen::Vector3f eye_pos = {0, 0, 10};
 
     r.set_vertex_shader(vertex_shader);
     r.set_fragment_shader(active_shader);
 
     int key = 0;
-    int frame_count = 0;
 
     if (command_line)
     {
@@ -332,7 +356,7 @@ int main(int argc, const char** argv)
         return 0;
     }
 
-    while(key != 27)
+    while (key != 27)
     {
         r.clear(rst::Buffers::Color | rst::Buffers::Depth);
 
@@ -340,7 +364,6 @@ int main(int argc, const char** argv)
         r.set_view(get_view_matrix(eye_pos));
         r.set_projection(get_projection_matrix(45.0, 1, 0.1, 50));
 
-        //r.draw(pos_id, ind_id, col_id, rst::Primitive::Triangle);
         r.draw(TriangleList);
         cv::Mat image(700, 700, CV_32FC3, r.frame_buffer().data());
         image.convertTo(image, CV_8UC3, 1.0f);
@@ -350,13 +373,13 @@ int main(int argc, const char** argv)
         cv::imwrite(filename, image);
         key = cv::waitKey(10);
 
-        if (key == 'a' )
+        if (key == 'a')
         {
-            angle -= 0.1;
+            angle -= 0.1f;
         }
         else if (key == 'd')
         {
-            angle += 0.1;
+            angle += 0.1f;
         }
 
     }

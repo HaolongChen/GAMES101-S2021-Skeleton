@@ -1,37 +1,30 @@
-//
-// Created by LEI XU on 4/11/19.
-//
+#pragma once
 
-#ifndef RASTERIZER_TRIANGLE_H
-#define RASTERIZER_TRIANGLE_H
+#include <Eigen/Eigen>
+#include <array>
 
-#include <eigen3/Eigen/Eigen>
+class Triangle
+{
+  public:
+    // Vertices in counter-clockwise order.
+    std::array<Eigen::Vector3f, 3> v{};
+    std::array<Eigen::Vector3f, 3> color{};      // per-vertex color
+    std::array<Eigen::Vector2f, 3> tex_coords{}; // per-vertex texture uv
+    std::array<Eigen::Vector3f, 3> normal{};     // per-vertex normal
 
-
-using namespace Eigen;
-class Triangle{
-
-public:
-    Vector3f v[3]; /*the original coordinates of the triangle, v0, v1, v2 in counter clockwise order*/
-    /*Per vertex values*/
-    Vector3f color[3]; //color at each vertex;
-    Vector2f tex_coords[3]; //texture u,v
-    Vector3f normal[3]; //normal vector for each vertex
-
-    //Texture *tex;
     Triangle();
 
-    void setVertex(int ind, Vector3f ver); /*set i-th vertex coordinates */
-    void setNormal(int ind, Vector3f n); /*set i-th vertex normal vector*/
-    void setColor(int ind, float r, float g, float b); /*set i-th vertex color*/
-    Vector3f getColor() const { return color[0]*255; } // Only one color per triangle.
-    void setTexCoord(int ind, float s, float t); /*set i-th vertex texture coordinate*/
-    std::array<Vector4f, 3> toVector4() const;
+    [[nodiscard]] Eigen::Vector3f a() const { return v[0]; }
+    [[nodiscard]] Eigen::Vector3f b() const { return v[1]; }
+    [[nodiscard]] Eigen::Vector3f c() const { return v[2]; }
+
+    void setVertex(int ind, Eigen::Vector3f ver);
+    void setNormal(int ind, Eigen::Vector3f n);
+    void setColor(int ind, float r, float g, float b);
+    void setTexCoord(int ind, float s, float t);
+
+    // Only one color per triangle.
+    [[nodiscard]] Eigen::Vector3f getColor() const { return color[0] * 255; }
+
+    [[nodiscard]] std::array<Eigen::Vector4f, 3> toVector4() const;
 };
-
-
-
-
-
-
-#endif //RASTERIZER_TRIANGLE_H
