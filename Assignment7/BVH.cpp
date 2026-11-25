@@ -1,37 +1,42 @@
-#include <algorithm>
-#include <cassert>
 #include "BVH.hpp"
 
-BVHAccel::BVHAccel(std::vector<Object*> p, int maxPrimsInNode,
-                   SplitMethod splitMethod)
-    : maxPrimsInNode(std::min(255, maxPrimsInNode)), splitMethod(splitMethod),
+#include <algorithm>
+#include <cassert>
+#include <chrono>
+#include <cmath>
+#include <iostream>
+#include <memory>
+#include <utility>
+#include <vector>
+
+BVHAccel::BVHAccel(std::vector<Object*> p, int maxPrimsInNode, SplitMethod splitMethod)
+    : maxPrimsInNode(std::min(255, maxPrimsInNode)),
+      splitMethod(splitMethod),
       primitives(std::move(p))
 {
-    time_t start, stop;
-    time(&start);
+    const auto start = std::chrono::steady_clock::now();
     if (primitives.empty())
         return;
 
     root = recursiveBuild(primitives);
 
-    time(&stop);
-    double diff = difftime(stop, start);
-    int hrs = (int)diff / 3600;
-    int mins = ((int)diff / 60) - (hrs * 60);
-    int secs = (int)diff - (hrs * 3600) - (mins * 60);
+    const auto stop = std::chrono::steady_clock::now();
+    const auto diff = std::chrono::duration_cast<std::chrono::seconds>(stop - start).count();
+    const auto hrs = diff / 3600;
+    const auto mins = (diff / 60) - (hrs * 60);
+    const auto secs = diff - (hrs * 3600) - (mins * 60);
 
-    printf(
-        "\rBVH Generation complete: \nTime Taken: %i hrs, %i mins, %i secs\n\n",
-        hrs, mins, secs);
+    std::cout << "\rBVH Generation complete: \nTime Taken: " << hrs << " hrs, " << mins
+              << " mins, " << secs << " secs\n\n";
 }
 
-BVHBuildNode* BVHAccel::recursiveBuild(std::vector<Object*> objects)
+std::unique_ptr<BVHBuildNode> BVHAccel::recursiveBuild(std::vector<Object*> objects)
 {
-    BVHBuildNode* node = new BVHBuildNode();
+    auto node = std::make_unique<BVHBuildNode>();
 
     // Compute bounds of all primitives in BVH node
     Bounds3 bounds;
-    for (int i = 0; i < objects.size(); ++i)
+    for (std::size_t i = 0; i < objects.size(); ++i)
         bounds = Union(bounds, objects[i]->getBounds());
     if (objects.size() == 1) {
         // Create leaf _BVHBuildNode_
@@ -52,27 +57,23 @@ BVHBuildNode* BVHAccel::recursiveBuild(std::vector<Object*> objects)
     }
     else {
         Bounds3 centroidBounds;
-        for (int i = 0; i < objects.size(); ++i)
-            centroidBounds =
-                Union(centroidBounds, objects[i]->getBounds().Centroid());
+        for (std::size_t i = 0; i < objects.size(); ++i)
+            centroidBounds = Union(centroidBounds, objects[i]->getBounds().Centroid());
         int dim = centroidBounds.maxExtent();
         switch (dim) {
         case 0:
             std::sort(objects.begin(), objects.end(), [](auto f1, auto f2) {
-                return f1->getBounds().Centroid().x <
-                       f2->getBounds().Centroid().x;
+                return f1->getBounds().Centroid().x < f2->getBounds().Centroid().x;
             });
             break;
         case 1:
             std::sort(objects.begin(), objects.end(), [](auto f1, auto f2) {
-                return f1->getBounds().Centroid().y <
-                       f2->getBounds().Centroid().y;
+                return f1->getBounds().Centroid().y < f2->getBounds().Centroid().y;
             });
             break;
         case 2:
             std::sort(objects.begin(), objects.end(), [](auto f1, auto f2) {
-                return f1->getBounds().Centroid().z <
-                       f2->getBounds().Centroid().z;
+                return f1->getBounds().Centroid().z < f2->getBounds().Centroid().z;
             });
             break;
         }
@@ -101,29 +102,32 @@ Intersection BVHAccel::Intersect(const Ray& ray) const
     Intersection isect;
     if (!root)
         return isect;
-    isect = BVHAccel::getIntersection(root, ray);
+    isect = BVHAccel::getIntersection(root.get(), ray);
     return isect;
 }
 
-Intersection BVHAccel::getIntersection(BVHBuildNode* node, const Ray& ray) const
+Intersection BVHAccel::getIntersection(const BVHBuildNode* node, const Ray& ray) const
 {
     // TODO Traverse the BVH to find intersection
 
 }
 
-
-void BVHAccel::getSample(BVHBuildNode* node, float p, Intersection &pos, float &pdf){
-    if(node->left == nullptr || node->right == nullptr){
+void BVHAccel::getSample(BVHBuildNode* node, float p, Intersection& pos, float& pdf)
+{
+    if (node->left == nullptr || node->right == nullptr) {
         node->object->Sample(pos, pdf);
         pdf *= node->area;
         return;
     }
-    if(p < node->left->area) getSample(node->left, p, pos, pdf);
-    else getSample(node->right, p - node->left->area, pos, pdf);
+    if (p < node->left->area)
+        getSample(node->left.get(), p, pos, pdf);
+    else
+        getSample(node->right.get(), p - node->left->area, pos, pdf);
 }
 
-void BVHAccel::Sample(Intersection &pos, float &pdf){
+void BVHAccel::Sample(Intersection& pos, float& pdf)
+{
     float p = std::sqrt(get_random_float()) * root->area;
-    getSample(root, p, pos, pdf);
+    getSample(root.get(), p, pos, pdf);
     pdf /= root->area;
 }
