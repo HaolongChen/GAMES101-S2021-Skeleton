@@ -1,68 +1,51 @@
-//
-// Created by LEI XU on 5/16/19.
-//
+#pragma once
 
-#ifndef RAYTRACING_BVH_H
-#define RAYTRACING_BVH_H
-
-#include <atomic>
-#include <vector>
-#include <memory>
-#include <ctime>
-#include "Object.hpp"
-#include "Ray.hpp"
 #include "Bounds3.hpp"
 #include "Intersection.hpp"
+#include "Object.hpp"
+#include "Ray.hpp"
 #include "Vector.hpp"
 
-struct BVHBuildNode;
-// BVHAccel Forward Declarations
-struct BVHPrimitiveInfo;
+#include <memory>
+#include <vector>
 
-// BVHAccel Declarations
-inline int leafNodes, totalLeafNodes, totalPrimitives, interiorNodes;
-class BVHAccel {
+struct BVHBuildNode
+{
+    Bounds3 bounds;
+    std::unique_ptr<BVHBuildNode> left;
+    std::unique_ptr<BVHBuildNode> right;
+    Object* object = nullptr; // non-owning; owned by the Scene
 
-public:
+    int splitAxis = 0;
+    int firstPrimOffset = 0;
+    int nPrimitives = 0;
+};
+
+class BVHAccel
+{
+  public:
     // BVHAccel Public Types
-    enum class SplitMethod { NAIVE, SAH };
+    enum class SplitMethod
+    {
+        NAIVE,
+        SAH
+    };
 
     // BVHAccel Public Methods
-    BVHAccel(std::vector<Object*> p, int maxPrimsInNode = 1, SplitMethod splitMethod = SplitMethod::NAIVE);
-    Bounds3 WorldBound() const;
-    ~BVHAccel();
+    BVHAccel(std::vector<Object*> p, int maxPrimsInNode = 1,
+             SplitMethod splitMethod = SplitMethod::NAIVE);
 
-    Intersection Intersect(const Ray &ray) const;
-    Intersection getIntersection(BVHBuildNode* node, const Ray& ray)const;
-    bool IntersectP(const Ray &ray) const;
-    BVHBuildNode* root;
+    [[nodiscard]] Intersection Intersect(const Ray& ray) const;
+    [[nodiscard]] Intersection getIntersection(const BVHBuildNode* node, const Ray& ray) const;
 
-    // BVHAccel Private Methods
-    BVHBuildNode* recursiveBuild(std::vector<Object*>objects);
+    std::unique_ptr<BVHBuildNode> root;
 
     // BVHAccel Private Data
     const int maxPrimsInNode;
     const SplitMethod splitMethod;
-    std::vector<Object*> primitives;
+    std::vector<Object*> primitives; // non-owning views; objects are owned by the Scene
+
+  private:
+    // BVHAccel Private Methods
+    std::unique_ptr<BVHBuildNode> recursiveBuild(std::vector<Object*> objects);
 };
-
-struct BVHBuildNode {
-    Bounds3 bounds;
-    BVHBuildNode *left;
-    BVHBuildNode *right;
-    Object* object;
-
-public:
-    int splitAxis=0, firstPrimOffset=0, nPrimitives=0;
-    // BVHBuildNode Public Methods
-    BVHBuildNode(){
-        bounds = Bounds3();
-        left = nullptr;right = nullptr;
-        object = nullptr;
-    }
-};
-
-
-
-
-#endif //RAYTRACING_BVH_H

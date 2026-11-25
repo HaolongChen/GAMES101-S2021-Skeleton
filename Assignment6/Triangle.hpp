@@ -5,13 +5,18 @@
 #include "Material.hpp"
 #include "OBJ_Loader.hpp"
 #include "Object.hpp"
-#include "Triangle.hpp"
-#include <cassert>
-#include <array>
 
-bool rayTriangleIntersect(const Vector3f& v0, const Vector3f& v1,
-                          const Vector3f& v2, const Vector3f& orig,
-                          const Vector3f& dir, float& tnear, float& u, float& v)
+#include <array>
+#include <cassert>
+#include <cmath>
+#include <limits>
+#include <memory>
+#include <string>
+#include <vector>
+
+inline bool rayTriangleIntersect(const Vector3f& v0, const Vector3f& v1, const Vector3f& v2,
+                                 const Vector3f& orig, const Vector3f& dir, float& tnear, float& u,
+                                 float& v)
 {
     Vector3f edge1 = v1 - v0;
     Vector3f edge2 = v2 - v0;
@@ -41,12 +46,12 @@ bool rayTriangleIntersect(const Vector3f& v0, const Vector3f& v1,
 
 class Triangle : public Object
 {
-public:
-    Vector3f v0, v1, v2; // vertices A, B ,C , counter-clockwise order
-    Vector3f e1, e2;     // 2 edges v1-v0, v2-v0;
+  public:
+    Vector3f v0, v1, v2; // vertices A, B, C, counter-clockwise order
+    Vector3f e1, e2;     // 2 edges v1-v0, v2-v0
     Vector3f t0, t1, t2; // texture coords
     Vector3f normal;
-    Material* m;
+    Material* m; // non-owning; owned by the MeshTriangle (or the caller)
 
     Triangle(Vector3f _v0, Vector3f _v1, Vector3f _v2, Material* _m = nullptr)
         : v0(_v0), v1(_v1), v2(_v2), m(_m)
@@ -57,16 +62,12 @@ public:
     }
 
     bool intersect(const Ray& ray) override;
-    bool intersect(const Ray& ray, float& tnear,
-                   uint32_t& index) const override;
+    bool intersect(const Ray& ray, float& tnear, uint32_t& index) const override;
     Intersection getIntersection(Ray ray) override;
-    void getSurfaceProperties(const Vector3f& P, const Vector3f& I,
-                              const uint32_t& index, const Vector2f& uv,
-                              Vector3f& N, Vector2f& st) const override
+    void getSurfaceProperties(const Vector3f& P, const Vector3f& I, const uint32_t& index,
+                              const Vector2f& uv, Vector3f& N, Vector2f& st) const override
     {
         N = normal;
-        //        throw std::runtime_error("triangle::getSurfaceProperties not
-        //        implemented.");
     }
     Vector3f evalDiffuseColor(const Vector2f&) const override;
     Bounds3 getBounds() override;
@@ -74,8 +75,8 @@ public:
 
 class MeshTriangle : public Object
 {
-public:
-    MeshTriangle(const std::string& filename)
+  public:
+    explicit MeshTriangle(const std::string& filename)
     {
         objl::Loader loader;
         loader.LoadFile(filename);
@@ -83,38 +84,37 @@ public:
         assert(loader.LoadedMeshes.size() == 1);
         auto mesh = loader.LoadedMeshes[0];
 
+        // One material shared by every face — the original code allocated an
+        // identical Material per face and leaked all of them.
+        material = std::make_unique<Material>(MaterialType::DIFFUSE_AND_GLOSSY,
+                                              Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
+        material->Kd = 0.6;
+        material->Ks = 0.0;
+        material->specularExponent = 0;
+
         Vector3f min_vert = Vector3f{std::numeric_limits<float>::infinity(),
                                      std::numeric_limits<float>::infinity(),
                                      std::numeric_limits<float>::infinity()};
         Vector3f max_vert = Vector3f{-std::numeric_limits<float>::infinity(),
                                      -std::numeric_limits<float>::infinity(),
                                      -std::numeric_limits<float>::infinity()};
-        for (int i = 0; i < mesh.Vertices.size(); i += 3) {
+        for (std::size_t i = 0; i < mesh.Vertices.size(); i += 3) {
             std::array<Vector3f, 3> face_vertices;
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < 3; ++j) {
                 auto vert = Vector3f(mesh.Vertices[i + j].Position.X,
                                      mesh.Vertices[i + j].Position.Y,
                                      mesh.Vertices[i + j].Position.Z) *
-                            60.f;
+                            60.0f;
                 face_vertices[j] = vert;
 
-                min_vert = Vector3f(std::min(min_vert.x, vert.x),
-                                    std::min(min_vert.y, vert.y),
+                min_vert = Vector3f(std::min(min_vert.x, vert.x), std::min(min_vert.y, vert.y),
                                     std::min(min_vert.z, vert.z));
-                max_vert = Vector3f(std::max(max_vert.x, vert.x),
-                                    std::max(max_vert.y, vert.y),
+                max_vert = Vector3f(std::max(max_vert.x, vert.x), std::max(max_vert.y, vert.y),
                                     std::max(max_vert.z, vert.z));
             }
 
-            auto new_mat =
-                new Material(MaterialType::DIFFUSE_AND_GLOSSY,
-                             Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
-            new_mat->Kd = 0.6;
-            new_mat->Ks = 0.0;
-            new_mat->specularExponent = 0;
-
-            triangles.emplace_back(face_vertices[0], face_vertices[1],
-                                   face_vertices[2], new_mat);
+            triangles.emplace_back(face_vertices[0], face_vertices[1], face_vertices[2],
+                                   material.get());
         }
 
         bounding_box = Bounds3(min_vert, max_vert);
@@ -123,12 +123,12 @@ public:
         for (auto& tri : triangles)
             ptrs.push_back(&tri);
 
-        bvh = new BVHAccel(ptrs);
+        bvh = std::make_unique<BVHAccel>(ptrs);
     }
 
-    bool intersect(const Ray& ray) { return true; }
+    bool intersect(const Ray& ray) override { return true; }
 
-    bool intersect(const Ray& ray, float& tnear, uint32_t& index) const
+    bool intersect(const Ray& ray, float& tnear, uint32_t& index) const override
     {
         bool intersect = false;
         for (uint32_t k = 0; k < numTriangles; ++k) {
@@ -136,8 +136,7 @@ public:
             const Vector3f& v1 = vertices[vertexIndex[k * 3 + 1]];
             const Vector3f& v2 = vertices[vertexIndex[k * 3 + 2]];
             float t, u, v;
-            if (rayTriangleIntersect(v0, v1, v2, ray.origin, ray.direction, t,
-                                     u, v) &&
+            if (rayTriangleIntersect(v0, v1, v2, ray.origin, ray.direction, t, u, v) &&
                 t < tnear) {
                 tnear = t;
                 index = k;
@@ -148,11 +147,10 @@ public:
         return intersect;
     }
 
-    Bounds3 getBounds() { return bounding_box; }
+    Bounds3 getBounds() override { return bounding_box; }
 
-    void getSurfaceProperties(const Vector3f& P, const Vector3f& I,
-                              const uint32_t& index, const Vector2f& uv,
-                              Vector3f& N, Vector2f& st) const
+    void getSurfaceProperties(const Vector3f& P, const Vector3f& I, const uint32_t& index,
+                              const Vector2f& uv, Vector3f& N, Vector2f& st) const override
     {
         const Vector3f& v0 = vertices[vertexIndex[index * 3]];
         const Vector3f& v1 = vertices[vertexIndex[index * 3 + 1]];
@@ -166,16 +164,15 @@ public:
         st = st0 * (1 - uv.x - uv.y) + st1 * uv.x + st2 * uv.y;
     }
 
-    Vector3f evalDiffuseColor(const Vector2f& st) const
+    Vector3f evalDiffuseColor(const Vector2f& st) const override
     {
         float scale = 5;
-        float pattern =
-            (fmodf(st.x * scale, 1) > 0.5) ^ (fmodf(st.y * scale, 1) > 0.5);
-        return lerp(Vector3f(0.815, 0.235, 0.031),
-                    Vector3f(0.937, 0.937, 0.231), pattern);
+        float pattern = static_cast<float>((std::fmod(st.x * scale, 1.0f) > 0.5f) ^
+                                           (std::fmod(st.y * scale, 1.0f) > 0.5f));
+        return lerp(Vector3f(0.815, 0.235, 0.031), Vector3f(0.937, 0.937, 0.231), pattern);
     }
 
-    Intersection getIntersection(Ray ray)
+    Intersection getIntersection(Ray ray) override
     {
         Intersection intersec;
 
@@ -188,20 +185,18 @@ public:
 
     Bounds3 bounding_box;
     std::unique_ptr<Vector3f[]> vertices;
-    uint32_t numTriangles;
+    uint32_t numTriangles = 0;
     std::unique_ptr<uint32_t[]> vertexIndex;
     std::unique_ptr<Vector2f[]> stCoordinates;
 
     std::vector<Triangle> triangles;
 
-    BVHAccel* bvh;
-
-    Material* m;
+    std::unique_ptr<BVHAccel> bvh;
+    std::unique_ptr<Material> material;
 };
 
 inline bool Triangle::intersect(const Ray& ray) { return true; }
-inline bool Triangle::intersect(const Ray& ray, float& tnear,
-                                uint32_t& index) const
+inline bool Triangle::intersect(const Ray& ray, float& tnear, uint32_t& index) const
 {
     return false;
 }
