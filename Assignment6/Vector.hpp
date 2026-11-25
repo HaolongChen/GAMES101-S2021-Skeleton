@@ -52,11 +52,28 @@ class Vector3f
         return os << v.x << ", " << v.y << ", " << v.z;
     }
 
-    [[nodiscard]] double operator[](int index) const { return (&x)[index]; }
+    // Explicit component selection instead of (&x)[index]: pointer
+    // arithmetic across distinct members is UB by the letter of the
+    // standard, however universal in practice. (Review point by Poke.)
+    [[nodiscard]] double operator[](int index) const
+    {
+        switch (index) {
+            case 0: return x;
+            case 1: return y;
+            default: return z;
+        }
+    }
     // The original header declared this as double&, which cannot bind to the
     // float storage — it was declared but never defined. float& is the honest
     // signature.
-    float& operator[](int index) { return (&x)[index]; }
+    float& operator[](int index)
+    {
+        switch (index) {
+            case 0: return x;
+            case 1: return y;
+            default: return z;
+        }
+    }
 
     static Vector3f Min(const Vector3f& p1, const Vector3f& p2)
     {
